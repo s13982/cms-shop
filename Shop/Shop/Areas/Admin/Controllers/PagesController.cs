@@ -143,5 +143,88 @@ namespace Shop.Areas.Admin.Controllers
 
             return RedirectToAction("EditPage");
         }
+
+        // GET: Admin/Pages/PageDetails/id
+        public ActionResult PageDetails(int id)
+        {
+            PageVM model;
+            using (Db db = new Db())
+            {
+                PageDTO dto = db.Pages.Find(id);
+
+                if (dto == null)
+                {
+                    return Content("The page does not exist.");
+                }
+
+                model = new PageVM(dto);
+            }
+
+            return View(model);
+        }
+
+        // GET: Admin/Pages/DeletePage/id
+        public ActionResult DeletePage(int id)
+        {
+            using (Db db = new Db())
+            {
+                PageDTO dto = db.Pages.Find(id);
+
+                db.Pages.Remove(dto);
+                db.SaveChanges();
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        // GET: Admin/Pages/ReorderPages
+        [HttpPost]
+        public void ReorderPages(int[] id)
+        {
+            using (Db db = new Db())
+            {
+                int count = 1;
+                PageDTO dto;
+                for (int i = 0; i < id.Length; i++)
+                {
+                    dto = db.Pages.Find(id[i]);
+                    dto.Sorting = count;
+
+                    db.SaveChanges();
+                    count++;
+                }
+            }
+        }
+
+        // GET: Admin/Pages/EditSidebar
+        [HttpGet]
+        public ActionResult EditSidebar()
+        {
+            SidebarVM model;
+
+            using (Db db = new Db())
+            {
+                SidebarDTO dto = db.Sidebar.Find(1);
+                model = new SidebarVM(dto);
+            }
+
+            return View(model);
+        }
+
+        // Post: Admin/Pages/EditSidebar
+        [HttpPost]
+        public ActionResult EditSidebar(SidebarVM model)
+        {
+            using (Db db = new Db())
+            {
+                SidebarDTO dto = db.Sidebar.Find(1);
+                dto.Body = model.Body;
+                db.SaveChanges();
+            }
+
+            TempData["SM"] = "You have edited the sidebar!";
+
+            return RedirectToAction("EditSidebar");
+        }
     }
 }
