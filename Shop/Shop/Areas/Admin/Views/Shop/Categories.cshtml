@@ -24,7 +24,7 @@
 }
 else
 {
-    <table class="table sorting" id="pages">
+    <table class="table sorting categories" id="pages">
         <tr class="home">
             <th>
                 @Html.DisplayNameFor(model => model.Name)
@@ -34,8 +34,9 @@ else
 
         @foreach (var item in Model)
         {
-            <tr>
+            <tr id="id_@item.Id">
                 <td>
+                    <div class="ajaxdivtd"></div>
                     @Html.EditorFor(modelItem => item.Name, new { htmlAttributes = new { @class = "form-control", @readonly = "readonly" } })
                 </td>
                 <td>
@@ -124,20 +125,83 @@ else
             });
         });
 
-        ////
+        //// Reorder categories
 
         $("table#pages tbody").sortable({
             items: "tr:not(.home)",
             placeholder: "ui-state-highlight",
             update: function () {
                 var ids = $("table#pages tbody").sortable("serialize");
-                var url = "/Admin/Pages/ReorderPages";
+                var url = "/Admin/Shop/ReorderCategories";
 
                 $.post(url, ids, function (data) {
 
                 });
             }
         });
+
+        /*
+        Confirm category deletion
+        */
+
+        $("body").on("click", "a.delete", function () {
+            if (!confirm("Confirm page deletion")) return false;
+        });
+
+        ////////
+
+        /*
+        Rename category
+        */
+
+        var originalTextBoxValue;
+
+        $("table#pages input.text-box").dblclick(function () {
+            originalTextBoxValue = $(this).val();
+            $(this).attr("readonly", false);
+        });
+
+        $("table#pages input.text-box").keyup(function (e) {
+            if (e.keyCode == 13) {
+                $(this).blur();
+            }
+        });
+
+        $("table#pages input.text-box").blur(function () {
+            var $this = $(this);
+            var ajaxdiv = $this.parent().find(".ajaxdivtd");
+            var newCatName = $this.val();
+            var id = $this.parent().parent().attr("id").substring(3);
+            var url = "/admin/shop/RenameCategory";
+
+            if (newCatName.length < 2) {
+                alert("Category name must be at least 2 characters long.");
+                $this.attr("readonly", true);
+                return false;
+            }
+
+            $.post(url, { newCatName: newCatName, id: id }, function (data) {
+                var response = data.trim();
+
+                if (response == "titletaken") {
+                    $this.val(originalTextBoxValue);
+                    ajaxdiv.html("<span class='alert alert-danger'>That title is tanken!</span>").show();
+                }
+                else {
+                    ajaxdiv.html("<span class='alert alert-success'>The category name has been changed!</span>").show();
+                }
+
+                setTimeout(function () {
+                    ajaxdiv.fadeOut("fast", function () {
+                        ajaxdiv.html("");
+                    });
+                }, 2000);
+                }).done(function () {
+                    $this.attr("readonly", true);
+            });
+        });
+
+        ////////
 
     </script>
 

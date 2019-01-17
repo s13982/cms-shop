@@ -49,5 +49,57 @@ namespace Shop.Areas.Admin.Controllers
 
             return id;
         }
+
+        // GET: Admin/Shop/ReorderCategories
+        [HttpPost]
+        public void ReorderCategories(int[] id)
+        {
+            using (Db db = new Db())
+            {
+                int count = 1;
+                CategoriesDTO dto;
+                for (int i = 0; i < id.Length; i++)
+                {
+                    dto = db.Categories.Find(id[i]);
+                    dto.Sorting = count;
+
+                    db.SaveChanges();
+                    count++;
+                }
+            }
+        }
+
+        // GET: Admin/Shop/DeleteCategory/id
+        public ActionResult DeleteCategory(int id)
+        {
+            using (Db db = new Db())
+            {
+                CategoriesDTO dto = db.Categories.Find(id);
+
+                db.Categories.Remove(dto);
+                db.SaveChanges();
+            }
+
+            return RedirectToAction("Categories");
+        }
+
+        // Post: Admin/Shop/RenameCategory
+        [HttpPost]
+        public string RenameCategory(string newCatName, int id)
+        {
+            using (Db db = new Db())
+            {
+                if (db.Categories.Any(a => a.Name == newCatName))
+                    return "titletaken";
+
+                CategoriesDTO dto = db.Categories.Find(id);
+                dto.Name = newCatName;
+                dto.Slug = newCatName.Replace(" ", "-").ToLower();
+
+                db.SaveChanges();
+            }
+
+            return "ok";
+        }
     }
 }
