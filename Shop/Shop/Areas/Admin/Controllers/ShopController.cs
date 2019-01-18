@@ -280,6 +280,7 @@ namespace Shop.Areas.Admin.Controllers
         }
 
         // GET: Admin/Shop/EditProduct/id
+        [HttpGet]
         public ActionResult EditProduct(int id)
         {
             // Declare producVM
@@ -309,6 +310,200 @@ namespace Shop.Areas.Admin.Controllers
 
             // Return view with model
             return View(model);
+        }
+
+        // Post: Admin/Shop/EditProduct/id
+        [HttpPost]
+        public ActionResult EditProduct(ProductVM model, HttpPostedFileBase file)
+        {
+            // Get product id
+            int id = model.Id;
+            // Populate categories select list and gallery images
+            using (Db db = new Db())
+            {
+                model.Categories = new SelectList(db.Categories.ToList(), "Id", "Name");
+            }
+            model.GalleryImages = Directory.EnumerateFiles(Server.MapPath("~/Images/Uploads/Products/" + id + "/Gallery/Thumbs"))
+                                      .Select(a => Path.GetFileName(a));
+
+            // Check model state
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            // Make sure product name is unique
+            using (Db db = new Db())
+            {
+                if (db.Products.Where(a => a.Id != id).Any(b => b.Name.Equals(model.Name)))
+                {
+                    ModelState.AddModelError("", "That product name is taken!");
+                    return View(model);
+                }
+            }
+
+            // Update product
+            using (Db db = new Db())
+            {
+                ProductDTO dto = db.Products.Find(id);
+
+                dto.Name = model.Name;
+                dto.Slug = model.Name.Replace(" ", "-").ToLower();
+                dto.Description = model.Description;
+                dto.Price = model.Price;
+                dto.CategoryId = model.CategoryId;
+                dto.ImageName = model.ImageName;
+
+                CategoriesDTO catDTO = db.Categories.FirstOrDefault(a => a.Id == model.CategoryId);
+                dto.CategoryName = catDTO.Name;
+
+                db.SaveChanges();
+            }
+
+            // Dont forget about tempdata 
+            TempData["SM"] = "You have edited the product!";
+
+            #region Image Upload
+
+            // Check for file upload
+            if (file != null && file.ContentLength > 0)
+            {
+                // Get file extension
+                string fileExtension = file.ContentType.ToLower();
+
+                // Verify extension
+                if (!fileExtension.Equals("image/jpg") &&
+                    !fileExtension.Equals("image/jpeg") &&
+                    !fileExtension.Equals("image/pjpeg") &&
+                    !fileExtension.Equals("image/gif") &&
+                    !fileExtension.Equals("image/x-png") &&
+                    !fileExtension.Equals("image/png"))
+                {
+                    using (Db db = new Db())
+                    {
+                        ModelState.AddModelError("", "The image was not uploaded - wrong image extension!");
+                        return View(model);
+                    }
+                }
+
+                // Set upload directory paths
+                DirectoryInfo originalDirectory = new DirectoryInfo(string.Format("{0}Images\\Uploads", Server.MapPath(@"\")));
+
+                string pathStringWithId = Path.Combine(originalDirectory.ToString(), "Products\\" + id.ToString());
+                string pathStringThumbs = Path.Combine(originalDirectory.ToString(), "Products\\" + id.ToString() + "\\Thumbs");
+
+                // Delete filese from directories !!!
+
+                DirectoryInfo productsDirectoryInfo = new DirectoryInfo(pathStringWithId);
+                DirectoryInfo productsThumbsDirectoryInfo = new DirectoryInfo(pathStringThumbs);
+
+                foreach (FileInfo item in productsDirectoryInfo.GetFiles())
+                {
+                    item.Delete();
+                }
+
+                foreach (FileInfo item in productsThumbsDirectoryInfo.GetFiles())
+                {
+                    item.Delete();
+                }
+
+                // Save image name
+
+                string imageName = file.FileName;
+
+                using (Db db = new Db())
+                {
+                    ProductDTO dto = db.Products.Find(id);
+                    dto.ImageName = imageName;
+
+                    db.SaveChanges();
+                }
+
+                // Save original and thumb images
+                string pathId = string.Format("{0}\\{1}", pathStringWithId, imageName);
+                string pathThumbs = string.Format("{0}\\{1}", pathStringThumbs, imageName);
+
+                // Save original
+                file.SaveAs(pathId);
+
+                // Create and save thumb
+                WebImage img = new WebImage(file.InputStream);
+                img.Resize(200, 200);
+                img.Save(pathThumbs);
+            }
+
+            #endregion
+
+            return RedirectToAction("EditProduct");
+        }
+
+        // GET: Admin/Shop/DeleteProduct/id
+        public ActionResult DeleteProduct(int id)
+        {
+            // Delete product from DB
+            using (Db db = new Db())
+            {
+                ProductDTO dto = db.Products.Find(id);
+                db.Products.Remove(dto);
+
+                db.SaveChanges();
+            }
+
+            // Delete product folder
+            DirectoryInfo originalDirectory = new DirectoryInfo(string.Format(string.Format("{0}Images\\Uploads", Server.MapPath(@"\"))));
+            string pathString = Path.Combine(originalDirectory.ToString(), "Products\\" + id.ToString());
+
+            if (Directory.Exists(pathString))
+                Directory.Delete(pathString, true);
+
+            // Redirect
+            return RedirectToAction("Products");
+        }
+
+        // Post: Admin/Shop/SaveGalleryImages
+        [HttpPost]
+        public void SaveGalleryImages(int id)
+        {
+            // Loop through the files 
+            foreach (string fileName in Request.Files)
+            {
+                // Initialize the file 
+                HttpPostedFileBase file = Request.Files[fileName];
+
+                // Check for null
+                if (file != null && file.ContentLength > 0)
+                {
+                    DirectoryInfo originalDirectory = new DirectoryInfo(string.Format(string.Format("{0}Images\\Uploads", Server.MapPath(@"\"))));
+                    string pathStringGallery = Path.Combine(originalDirectory.ToString(), "Products\\" + id.ToString() + "\\Gallery");
+                    string pathStringGalleryThumbs = Path.Combine(originalDirectory.ToString(), "Products\\" + id.ToString() + "\\Gallery\\Thumbs");
+
+                    string finalPathGallery = Path.Combine("{0}\\{1}", pathStringGallery, file.FileName);
+                    string finalPathGalleryThumbs = Path.Combine("{0}\\{1}", pathStringGalleryThumbs, file.FileName);
+
+                    // Save original and thumb
+
+                    file.SaveAs(finalPathGallery);
+                    WebImage img = new WebImage(file.InputStream);
+                    img.Resize(200, 200);
+                    img.Save(finalPathGalleryThumbs);
+                }
+            }
+        }
+
+        // Post: Admin/Shop/DeleteImage
+        [HttpPost]
+        public void DeleteImage(int id, string imageName)
+        {
+            string pathGallery = Request.MapPath("~/Images/Uploads/Products/" + id.ToString() + "/Gallery/" + imageName);
+            string pathGalleryThumbs = Request.MapPath("~/Images/Uploads/Products/" + id.ToString() + "/Gallery/Thumbs/" + imageName);
+
+            if (System.IO.File.Exists(pathGallery))
+                System.IO.File.Delete(pathGallery);
+
+            if (System.IO.File.Exists(pathGalleryThumbs))
+                System.IO.File.Delete(pathGalleryThumbs);
+
+            System.Diagnostics.Debug.WriteLine("GAVVNO");
         }
     }
 }

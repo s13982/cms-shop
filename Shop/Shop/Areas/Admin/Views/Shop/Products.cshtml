@@ -64,7 +64,7 @@
             </td>
             <td>
                 @Html.ActionLink("Edit", "EditProduct", new { id = product.Id }) |
-                @Html.ActionLink("Delete", "DeleteProduct", new { id = product.Id })
+                @Html.ActionLink("Delete", "DeleteProduct", new { id = product.Id }, new { @class = "delete" })
             </td>
         </tr>
     }
@@ -99,7 +99,7 @@
             */
             $(function () {
                 $("a.delete").click(function () {
-                    if (!confirm("Confirm page deletion")) return false;
+                    if (!confirm("Confirm product deletion")) return false;
                 });
             });
 
